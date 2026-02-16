@@ -1,0 +1,6 @@
+@Safe_Space_HostAddress = http://localhost:5101
+
+GET {{Safe_Space_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
