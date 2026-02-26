@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using SafeSpace.Data;
 using SafeSpace.Models;
+using SafeSpace.DTOs;
 
 namespace SafeSpace.Controllers
 {
@@ -9,110 +9,88 @@ namespace SafeSpace.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly AppDbContext _context;
 
-        public AuthController(
-            UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager,
-            AppDbContext context)
+        public AuthController(AppDbContext context)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
             _context = context;
         }
 
-        // ==========================
         // Register Doctor
-        // ==========================
         [HttpPost("register-doctor")]
-        public async Task<IActionResult> RegisterDoctor(
-            string fullName,
-            string email,
-            string password,
-            string specialization,
-            string bio)
+        public async Task<IActionResult> RegisterDoctor([FromBody] RegisterDoctorDto model)
         {
-            var user = new ApplicationUser
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var doctor = new Doctor
             {
-                UserName = email,
-                Email = email,
-                FullName = fullName,
-                Role = "Doctor"
+                Id = Guid.NewGuid(),
+                FullName = model.FullName,
+                Email = model.Email,
+                PasswordHash = model.Password, // هنعدلها بعدين لهاش
+                Specialization = model.Specialization,
+                Bio = model.Bio
             };
 
-            var result = await _userManager.CreateAsync(user, password);
-
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-
-            var doctor = new DoctorProfile
-            {
-                UserId = user.Id,
-                Specialization = specialization,
-                Bio = bio
-            };
-
-            _context.DoctorProfiles.Add(doctor);
+            _context.Doctors.Add(doctor);
             await _context.SaveChangesAsync();
 
             return Ok("Doctor Registered Successfully");
         }
 
-        // ==========================
         // Register Patient
-        // ==========================
         [HttpPost("register-patient")]
-        public async Task<IActionResult> RegisterPatient(
-            string fullName,
-            string email,
-            string password,
-            int age,
-            string gender)
+        public async Task<IActionResult> RegisterPatient([FromBody] RegisterPatientDto model)
         {
-            var user = new ApplicationUser
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var patient = new Patient
             {
-                UserName = email,
-                Email = email,
-                FullName = fullName,
-                Role = "Patient"
+                Id = Guid.NewGuid(),
+                FullName = model.FullName,
+                Email = model.Email,
+                PasswordHash = model.Password, // هنعدلها لهاش
+                Age = model.Age,
+                Gender = model.Gender
             };
 
-            var result = await _userManager.CreateAsync(user, password);
-
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-
-            var patient = new PatientProfile
-            {
-                UserId = user.Id,
-                Age = age,
-                Gender = gender
-            };
-
-            _context.PatientProfiles.Add(patient);
+            _context.Patients.Add(patient);
             await _context.SaveChangesAsync();
 
             return Ok("Patient Registered Successfully");
         }
 
-        // ==========================
         // Login
-        // ==========================
         [HttpPost("login")]
-        public async Task<IActionResult> Login(string email, string password)
+        public IActionResult Login([FromBody] LoginDto model)
         {
-            var result = await _signInManager.PasswordSignInAsync(
-                email,
-                password,
-                false,
-                false);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            if (!result.Succeeded)
-                return Unauthorized("Invalid Email or Password");
+            var doctor = _context.Doctors.FirstOrDefault(d => d.Email == model.Email);
+            var patient = _context.Patients.FirstOrDefault(p => p.Email == model.Email);
 
-            return Ok("Login Successful");
+            BaseUser? user = null;
+
+            if (doctor != null)
+                user = doctor;
+            else if (patient != null)
+                user = patient;
+
+            if (user == null)
+                return Unauthorized("Invalid Email");
+
+            if (user.PasswordHash != model.Password)
+                return Unauthorized("Invalid Password");
+
+            return Ok(new
+            {
+                user.Id,
+                user.FullName,
+                user.Email
+            });
         }
     }
 }
