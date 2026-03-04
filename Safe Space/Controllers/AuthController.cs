@@ -10,56 +10,67 @@ namespace SafeSpace.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly SafeSpace.Services.EmailService _emailService;
 
-        public AuthController(AppDbContext context)
+        public AuthController(AppDbContext context, SafeSpace.Services.EmailService emailService)
         {
             _context = context;
-        }
-
-        // Register Doctor
-        [HttpPost("register-doctor")]
-        public async Task<IActionResult> RegisterDoctor([FromBody] RegisterDoctorDto model)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var doctor = new Doctor
-            {
-                Id = Guid.NewGuid(),
-                FullName = model.FullName,
-                Email = model.Email,
-                PasswordHash = model.Password, // هنعدلها بعدين لهاش
-                Specialization = model.Specialization,
-                Bio = model.Bio
-            };
-
-            _context.Doctors.Add(doctor);
-            await _context.SaveChangesAsync();
-
-            return Ok("Doctor Registered Successfully");
+            _emailService = emailService;
         }
 
         // Register Patient
-        [HttpPost("register-patient")]
+        [HttpPost("register")]
         public async Task<IActionResult> RegisterPatient([FromBody] RegisterPatientDto model)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            if (_context.Patients.Any(p => p.Email == model.Email))
+                return BadRequest("Email already exists");
+
+            var token = Guid.NewGuid().ToString();
+
             var patient = new Patient
             {
-                Id = Guid.NewGuid(),
                 FullName = model.FullName,
                 Email = model.Email,
-                PasswordHash = model.Password, // هنعدلها لهاش
+                PasswordHash = model.Password,
                 Age = model.Age,
-                Gender = model.Gender
+                Gender = model.Gender,
+                EmailVerificationToken = token,
+                IsEmailVerified = false
             };
 
             _context.Patients.Add(patient);
             await _context.SaveChangesAsync();
 
-            return Ok("Patient Registered Successfully");
+            
+            var verificationLink =
+                $"{Request.Scheme}://{Request.Host}/api/auth/verify-email?token={token}";
+
+         
+            _emailService.SendVerificationEmail(model.Email, verificationLink);
+
+            return Ok("Account created. Please verify your email.");
+        }
+
+        // Verify Email
+        [HttpGet("verify-email")]
+        public IActionResult VerifyEmail(string token)
+        {
+            var user = _context.Patients
+                .FirstOrDefault(p => p.EmailVerificationToken == token);
+
+            if (user == null)
+                return BadRequest("Invalid token");
+
+            user.IsEmailVerified = true;
+            user.EmailVerificationToken = null;
+
+            _context.SaveChanges();
+
+
+            return Ok("Email verified successfully");
         }
 
         // Login
@@ -69,18 +80,14 @@ namespace SafeSpace.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var doctor = _context.Doctors.FirstOrDefault(d => d.Email == model.Email);
-            var patient = _context.Patients.FirstOrDefault(p => p.Email == model.Email);
-
-            BaseUser? user = null;
-
-            if (doctor != null)
-                user = doctor;
-            else if (patient != null)
-                user = patient;
+            var user = _context.Patients
+                .FirstOrDefault(p => p.Email == model.Email);
 
             if (user == null)
                 return Unauthorized("Invalid Email");
+
+            if (!user.IsEmailVerified)
+                return Unauthorized("Please verify your email first");
 
             if (user.PasswordHash != model.Password)
                 return Unauthorized("Invalid Password");

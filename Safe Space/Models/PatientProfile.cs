@@ -9,5 +9,8 @@ namespace SafeSpace.Models
 
         [Required]
         public required string Gender { get; set; }
+        public bool IsEmailVerified { get; set; } = false;
+
+        public string? EmailVerificationToken { get; set; }
     }
 }

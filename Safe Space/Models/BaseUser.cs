@@ -5,7 +5,7 @@ namespace SafeSpace.Models
     public abstract class BaseUser
     {
         [Key]
-        public Guid Id { get; set; }
+        public int Id { get; set; }
 
         [Required]
         public required string FullName { get; set; }
