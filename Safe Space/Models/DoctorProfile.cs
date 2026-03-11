@@ -9,5 +9,11 @@ namespace SafeSpace.Models
 
         [Required]
         public required string Bio { get; set; }
+
+        public string? ProfileImageUrl { get; set; }
+
+        public double Rating { get; set; } = 0;
+
+        public int ReviewsCount { get; set; } = 0;
     }
 }

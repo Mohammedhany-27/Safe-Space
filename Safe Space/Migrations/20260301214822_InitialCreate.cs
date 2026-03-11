@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace Safe_Space.Migrations
+namespace SafeSpace.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

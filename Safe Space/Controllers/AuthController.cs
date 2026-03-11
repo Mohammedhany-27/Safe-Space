@@ -1,4 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Mvc;
 using SafeSpace.Data;
 using SafeSpace.Models;
 using SafeSpace.DTOs;
@@ -11,11 +15,15 @@ namespace SafeSpace.Controllers
     {
         private readonly AppDbContext _context;
         private readonly SafeSpace.Services.EmailService _emailService;
+        private readonly IConfiguration _config;
 
-        public AuthController(AppDbContext context, SafeSpace.Services.EmailService emailService)
+        public AuthController(AppDbContext context,
+                      SafeSpace.Services.EmailService emailService,
+                      IConfiguration config)
         {
             _context = context;
             _emailService = emailService;
+            _config = config;
         }
 
         // Register Patient
@@ -30,9 +38,15 @@ namespace SafeSpace.Controllers
 
             var token = Guid.NewGuid().ToString();
 
+            if (model.Password != model.ConfirmPassword)
+            {
+                return BadRequest("Passwords do not match");
+            }
+
             var patient = new Patient
             {
                 FullName = model.FullName,
+                DisplayName = model.DisplayName,
                 Email = model.Email,
                 PasswordHash = model.Password,
                 Age = model.Age,
@@ -92,12 +106,39 @@ namespace SafeSpace.Controllers
             if (user.PasswordHash != model.Password)
                 return Unauthorized("Invalid Password");
 
+            var claims = new[]
+            {
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Email, user.Email),
+        new Claim(ClaimTypes.Name, user.FullName)
+    };
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+
+            var creds = new SigningCredentials(
+                key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"],
+                audience: _config["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddDays(7),
+                signingCredentials: creds
+            );
+
+            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
             return Ok(new
             {
-                user.Id,
-                user.FullName,
-                user.Email
+                token = jwt,
+                user = new
+                {
+                    user.Id,
+                    user.FullName,
+                    user.Email
+                }
             });
         }
     }
-}
+    }

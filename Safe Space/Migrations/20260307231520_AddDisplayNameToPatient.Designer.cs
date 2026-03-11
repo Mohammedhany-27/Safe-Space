@@ -11,15 +11,15 @@ using SafeSpace.Data;
 namespace SafeSpace.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260301214822_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260307231520_AddDisplayNameToPatient")]
+    partial class AddDisplayNameToPatient
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "8.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -67,6 +67,10 @@ namespace SafeSpace.Migrations
 
                     b.Property<int>("Age")
                         .HasColumnType("int");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
                         .IsRequired()
